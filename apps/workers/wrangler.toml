@@ -1,0 +1,94 @@
+name = "coreberg-workers"
+main = "src/index.ts"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+# ---------------------------------------------------------------------------
+# Workflows
+# ---------------------------------------------------------------------------
+[[workflows]]
+name = "onboarding-workflow"
+binding = "ONBOARDING_WORKFLOW"
+class_name = "OnboardingWorkflow"
+
+[[workflows]]
+name = "generation-workflow"
+binding = "GENERATION_WORKFLOW"
+class_name = "GenerationWorkflow"
+
+[[workflows]]
+name = "monitoring-workflow"
+binding = "MONITORING_WORKFLOW"
+class_name = "MonitoringWorkflow"
+
+[[workflows]]
+name = "learning-workflow"
+binding = "LEARNING_WORKFLOW"
+class_name = "LearningWorkflow"
+
+[[workflows]]
+name = "metrics-refresh-workflow"
+binding = "METRICS_REFRESH_WORKFLOW"
+class_name = "MetricsRefreshWorkflow"
+
+# ---------------------------------------------------------------------------
+# Queues
+# ---------------------------------------------------------------------------
+[[queues.producers]]
+binding = "ARTICLE_QUEUE"
+queue = "coreberg-articles"
+
+[[queues.producers]]
+binding = "MONITORING_QUEUE"
+queue = "coreberg-monitoring"
+
+[[queues.consumers]]
+queue = "coreberg-articles"
+max_batch_size = 10
+max_batch_timeout = 5
+max_retries = 5
+dead_letter_queue = "coreberg-articles-dlq"
+
+[[queues.consumers]]
+queue = "coreberg-monitoring"
+max_batch_size = 25
+max_batch_timeout = 10
+max_retries = 3
+dead_letter_queue = "coreberg-monitoring-dlq"
+
+# ---------------------------------------------------------------------------
+# Durable Objects
+# ---------------------------------------------------------------------------
+[[durable_objects.bindings]]
+name = "PROGRESS_DO"
+class_name = "ProgressAggregator"
+
+[[migrations]]
+tag = "v1"
+new_classes = ["ProgressAggregator"]
+
+# ---------------------------------------------------------------------------
+# Cron Triggers (JST)
+# ---------------------------------------------------------------------------
+[triggers]
+crons = [
+  "0 17 * * *",   # 02:00 JST 日次 Citation Monitoring
+  "0 18 1 * *",   # 月初 03:00 JST 学習ループ
+  "*/5 * * * *"   # 5分毎のメトリクス/SLOデータ/コスト監視バッチ
+]
+
+[observability]
+enabled = true
+
+# Secrets:
+# - SUPABASE_URL
+# - SUPABASE_SERVICE_ROLE_KEY
+# - GEMINI_API_KEY
+# - AI_GATEWAY_URL
+# - QUEUE_HMAC_SECRET
+# - SERPAPI_KEY
+# - PERPLEXITY_API_KEY
+# - OPENAI_API_KEY
+# - PAGESPEED_API_KEY
+# - INDEXNOW_KEY
+# - RESEND_API_KEY

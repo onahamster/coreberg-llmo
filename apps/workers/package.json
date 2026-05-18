@@ -1,0 +1,24 @@
+{
+  "name": "@coreberg/workers",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "src/index.ts",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@coreberg/ai": "workspace:*",
+    "@coreberg/shared": "workspace:*",
+    "@coreberg/workers-shared": "workspace:*",
+    "@supabase/supabase-js": "^2.46.1",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "typescript": "^5.6.3",
+    "wrangler": "^3.86.0"
+  }
+}

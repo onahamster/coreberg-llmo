@@ -1,0 +1,86 @@
+name: Deploy Production
+on:
+  push: { tags: ['release/*'] }
+
+jobs:
+  approval:
+    runs-on: ubuntu-latest
+    environment: production-approval
+    steps:
+      - run: echo "awaiting manual signoff from administrators"
+
+  migrate:
+    needs: approval
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: supabase/setup-cli@v1
+      - run: supabase link --project-ref ${{ secrets.SUPABASE_PRODUCTION_REF }} --password ${{ secrets.SUPABASE_DB_PASSWORD }}
+      - run: supabase db push
+
+  deploy-workers:
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @coreberg/workers build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers
+          command: deploy
+
+  deploy-web:
+    needs: migrate
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with: { version: 9 }
+      - uses: actions/setup-node@v4
+        with: { node-version: 20, cache: pnpm }
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm --filter @coreberg/web build
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          command: pages deploy apps/web/.vercel/output/static --project-name coreberg-web
+
+  smoke:
+    needs: [deploy-workers, deploy-web]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: 20 }
+      - run: npx playwright install --with-deps chromium
+      - run: npx playwright test tests/e2e/smoke.spec.ts
+        env: { E2E_BASE_URL: https://coreberg.app }
+
+  rollback-on-failure:
+    needs: smoke
+    if: failure()
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: cloudflare/wrangler-action@v3
+        with:
+          apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          workingDirectory: apps/workers
+          command: rollback --message "auto-rollback: smoke failed"
+      - name: Notify Slack
+        run: |
+          curl -X POST -H 'Content-type: application/json' \
+            --data '{"text":"🚨 Production deploy rolled back: ${{ github.sha }}"}' \
+            ${{ secrets.SLACK_OPS_WEBHOOK }}

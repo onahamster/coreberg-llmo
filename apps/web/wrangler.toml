@@ -1,0 +1,49 @@
+name = "coreberg-web"
+main = ".open-next/worker.js"
+compatibility_date = "2025-01-15"
+compatibility_flags = ["nodejs_compat"]
+
+[assets]
+directory = ".open-next/assets"
+binding = "ASSETS"
+
+[observability]
+enabled = true
+
+[[routes]]
+pattern = "app.coreberg.com"
+custom_domain = true
+
+# ---------------------------------------------------------------------------
+# Workflows: apps/workers で定義済みの class を参照
+# ---------------------------------------------------------------------------
+[[workflows]]
+name = "onboarding-workflow"
+binding = "ONBOARDING_WORKFLOW"
+class_name = "OnboardingWorkflow"
+script_name = "coreberg-workers"
+
+[[workflows]]
+name = "generation-workflow"
+binding = "GENERATION_WORKFLOW"
+class_name = "GenerationWorkflow"
+script_name = "coreberg-workers"
+
+# ---------------------------------------------------------------------------
+# Queues (producer)
+# ---------------------------------------------------------------------------
+[[queues.producers]]
+binding = "ARTICLE_QUEUE"
+queue = "coreberg-articles"
+
+# Secrets (wrangler secret put で投入):
+#   NEXT_PUBLIC_SUPABASE_URL
+#   NEXT_PUBLIC_SUPABASE_ANON_KEY
+#   SUPABASE_SERVICE_ROLE_KEY
+#   NEXT_PUBLIC_APP_URL
+#   STRIPE_SECRET_KEY
+#   STRIPE_WEBHOOK_SECRET
+#   GEMINI_API_KEY
+#   AI_GATEWAY_URL
+#   RESEND_API_KEY
+#   INDEXNOW_KEY
