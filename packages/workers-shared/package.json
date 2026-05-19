@@ -17,6 +17,7 @@
   "dependencies": {
     "@coreberg/shared": "workspace:*",
     "@coreberg/ai": "workspace:*",
+    "@coreberg/wordpress": "workspace:*",
     "@supabase/supabase-js": "^2.46.1",
     "zod": "^3.23.8"
   },

@@ -29,12 +29,22 @@ binding = "GENERATION_WORKFLOW"
 class_name = "GenerationWorkflow"
 script_name = "coreberg-workers"
 
+[[workflows]]
+name = "monitoring-workflow"
+binding = "MONITORING_WORKFLOW"
+class_name = "MonitoringWorkflow"
+script_name = "coreberg-workers"
+
 # ---------------------------------------------------------------------------
 # Queues (producer)
 # ---------------------------------------------------------------------------
 [[queues.producers]]
 binding = "ARTICLE_QUEUE"
 queue = "coreberg-articles"
+
+[[queues.producers]]
+binding = "MONITORING_QUEUE"
+queue = "coreberg-monitoring"
 
 # Secrets (wrangler secret put で投入):
 #   NEXT_PUBLIC_SUPABASE_URL

@@ -11,6 +11,11 @@ export function createDb(env: WorkersEnv): SupabaseClient {
 }
 
 /**
+ * getServiceClient は createDb のエイリアス（後方互換のため）
+ */
+export const getServiceClient = createDb;
+
+/**
  * generation_runs のステータスを更新するヘルパー
  */
 export async function updateRunStatus(
@@ -61,5 +66,33 @@ export async function recordAiUsage(
   if (error) {
     // ログに記録するだけ。コストトラッキング失敗で本処理を止めない
     console.error('recordAiUsage failed', error.message);
+  }
+}
+
+/**
+ * audit_logs テーブルへの監査ログ記録ヘルパー
+ */
+export async function recordAuditLog(
+  db: SupabaseClient,
+  row: {
+    actor_type: 'system' | 'customer' | 'admin';
+    actor_id?: string | null;
+    action: string;
+    target_type: string;
+    target_id?: string | null;
+    metadata?: unknown;
+  },
+): Promise<void> {
+  const { error } = await db.from('audit_logs').insert({
+    actor_type: row.actor_type,
+    actor_id: row.actor_id ?? null,
+    action: row.action,
+    target_type: row.target_type,
+    target_id: row.target_id ?? null,
+    metadata: row.metadata ?? null,
+  });
+  if (error) {
+    // 監査ログ失敗で本処理を止めない
+    console.error('recordAuditLog failed', error.message);
   }
 }

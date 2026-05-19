@@ -9,10 +9,12 @@ export interface WorkersEnv {
   GENERATION_WORKFLOW: Workflow;
   MONITORING_WORKFLOW: Workflow;
   LEARNING_WORKFLOW: Workflow;
+  METRICS_REFRESH_WORKFLOW: Workflow;
 
   // Queues (producer 側のバインディング)
   ARTICLE_QUEUE: Queue<ArticleQueueMessage>;
   MONITORING_QUEUE: Queue<MonitoringQueueMessage>;
+  INDEXNOW_QUEUE?: Queue<{ type: string; projectId: string; articleId: string; url: string }>;
 
   // Durable Objects
   PROGRESS_DO: DurableObjectNamespace;
@@ -28,9 +30,17 @@ export interface WorkersEnv {
   SERPAPI_KEY?: string;
   PERPLEXITY_API_KEY?: string;
   OPENAI_API_KEY?: string;
+  ANTHROPIC_API_KEY?: string;
   PAGESPEED_API_KEY?: string;
   INDEXNOW_KEY?: string;
   RESEND_API_KEY?: string;
+  STRIPE_SECRET_KEY?: string;
+
+  // Sentry
+  SENTRY_DSN?: string;
+  SENTRY_ENVIRONMENT?: string;
+  SENTRY_RELEASE?: string;
+  SENTRY_TRACES_SAMPLE_RATE?: string;
 }
 
 // ---------------------------------------------------------------------------

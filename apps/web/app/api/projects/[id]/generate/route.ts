@@ -50,6 +50,12 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
     return NextResponse.json({ runId: run.id, status: 'already_running' });
   }
 
+  // M-14 修正: completed も二重起動を防ぐ
+  // ボタン連打や再試行によるコスト爆発を防止する
+  if (run.status === 'completed') {
+    return NextResponse.json({ runId: run.id, status: 'already_completed' });
+  }
+
   const bindings = await getBindings();
   if (!bindings) {
     return NextResponse.json({ error: 'workflow_unavailable' }, { status: 503 });

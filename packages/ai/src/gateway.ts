@@ -1,6 +1,15 @@
 /**
- * Gemini API への薄いクライアント。AI Gateway URL が設定されていれば
- * その経由でリクエストする。
+ * プロバイダ抽象化 AI Gateway クライアント
+ *
+ * モデル名のプレフィックスでプロバイダを自動判定し、
+ * 各 API のペイロード形式に変換する。
+ *
+ *   gemini-*    → Google AI (Gemini) API
+ *   claude-*    → Anthropic Messages API
+ *   gpt-*       → OpenAI Chat Completions API
+ *
+ * これにより、プロンプト側のコードを一切変更せずに環境変数の
+ * モデル ID を切り替えるだけでフォールバックが機能する。
  */
 export interface GenerateOptions {
   model: string;
@@ -42,17 +51,59 @@ export interface GenerateResult<T = unknown> {
 export interface GatewayConfig {
   apiKey: string;
   gatewayUrl?: string;
+  /** Anthropic API キー (claude-* モデルへのフォールバック用) */
+  anthropicApiKey?: string;
+  /** OpenAI API キー (gpt-* モデルへのフォールバック用) */
+  openaiApiKey?: string;
 }
 
-const DEFAULT_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+/** モデル名からプロバイダを判定する */
+function detectProvider(model: string): 'gemini' | 'anthropic' | 'openai' {
+  if (model.startsWith('claude-')) return 'anthropic';
+  if (model.startsWith('gpt-') || model.startsWith('o1') || model.startsWith('o3')) return 'openai';
+  return 'gemini';
+}
+
+const DEFAULT_GEMINI_BASE = 'https://generativelanguage.googleapis.com/v1beta';
+const DEFAULT_ANTHROPIC_BASE = 'https://api.anthropic.com/v1';
+const DEFAULT_OPENAI_BASE = 'https://api.openai.com/v1';
 
 function resolveEndpoint(config: GatewayConfig, model: string): string {
-  const base = config.gatewayUrl?.replace(/\/$/, '') ?? DEFAULT_BASE;
-  // AI Gateway 経由でも同じパス構造を維持
+  const provider = detectProvider(model);
+  if (provider === 'anthropic') {
+    return config.gatewayUrl
+      ? `${config.gatewayUrl.replace(/\/$/, '')}/anthropic/messages`
+      : `${DEFAULT_ANTHROPIC_BASE}/messages`;
+  }
+  if (provider === 'openai') {
+    return config.gatewayUrl
+      ? `${config.gatewayUrl.replace(/\/$/, '')}/openai/chat/completions`
+      : `${DEFAULT_OPENAI_BASE}/chat/completions`;
+  }
+  // Gemini
+  const base = config.gatewayUrl?.replace(/\/$/, '') ?? DEFAULT_GEMINI_BASE;
   return `${base}/models/${model}:generateContent`;
 }
 
 export async function generateContent<T = unknown>(
+  config: GatewayConfig,
+  options: GenerateOptions,
+): Promise<GenerateResult<T>> {
+  const provider = detectProvider(options.model);
+
+  if (provider === 'anthropic') {
+    return generateContentAnthropic<T>(config, options);
+  }
+  if (provider === 'openai') {
+    return generateContentOpenAI<T>(config, options);
+  }
+  return generateContentGemini<T>(config, options);
+}
+
+// ---------------------------------------------------------------------------
+// Gemini (Google AI)
+// ---------------------------------------------------------------------------
+async function generateContentGemini<T = unknown>(
   config: GatewayConfig,
   options: GenerateOptions,
 ): Promise<GenerateResult<T>> {
@@ -112,6 +163,137 @@ export async function generateContent<T = unknown>(
       inputTokens: data.usageMetadata?.promptTokenCount ?? 0,
       outputTokens: data.usageMetadata?.candidatesTokenCount ?? 0,
       thinkingTokens: data.usageMetadata?.thoughtsTokenCount ?? 0,
+    },
+    raw: data,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// Anthropic (Claude)
+// ---------------------------------------------------------------------------
+async function generateContentAnthropic<T = unknown>(
+  config: GatewayConfig,
+  options: GenerateOptions,
+): Promise<GenerateResult<T>> {
+  const apiKey = config.anthropicApiKey;
+  if (!apiKey) throw new Error('anthropicApiKey is required for claude-* models');
+
+  const url = resolveEndpoint(config, options.model);
+  // Gemini の GeminiContent[] を Anthropic Messages 形式に変換
+  const messages = options.contents.map((c) => ({
+    role: c.role === 'model' ? 'assistant' : 'user',
+    content: c.parts
+      .map((p) => ('text' in p ? { type: 'text', text: p.text } : null))
+      .filter(Boolean),
+  }));
+
+  const body: Record<string, unknown> = {
+    model: options.model,
+    max_tokens: options.maxOutputTokens ?? 8192,
+    messages,
+    ...(options.systemInstruction ? { system: options.systemInstruction } : {}),
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'x-api-key': apiKey,
+      'anthropic-version': '2023-06-01',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`Anthropic API ${res.status}: ${txt.slice(0, 500)}`);
+  }
+
+  const data = (await res.json()) as {
+    content?: Array<{ type: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
+  };
+  const text = (data.content ?? [])
+    .filter((b) => b.type === 'text')
+    .map((b) => b.text ?? '')
+    .join('');
+  let json: T | null = null;
+  if (options.responseMimeType === 'application/json' && text) {
+    try { json = JSON.parse(text) as T; } catch { json = null; }
+  }
+  return {
+    json,
+    text,
+    usage: {
+      inputTokens: data.usage?.input_tokens ?? 0,
+      outputTokens: data.usage?.output_tokens ?? 0,
+      thinkingTokens: 0,
+    },
+    raw: data,
+  };
+}
+
+// ---------------------------------------------------------------------------
+// OpenAI (GPT)
+// ---------------------------------------------------------------------------
+async function generateContentOpenAI<T = unknown>(
+  config: GatewayConfig,
+  options: GenerateOptions,
+): Promise<GenerateResult<T>> {
+  const apiKey = config.openaiApiKey;
+  if (!apiKey) throw new Error('openaiApiKey is required for gpt-* models');
+
+  const url = resolveEndpoint(config, options.model);
+  // Gemini の GeminiContent[] を OpenAI ChatCompletion 形式に変換
+  const messages: { role: string; content: string }[] = [];
+  if (options.systemInstruction) {
+    messages.push({ role: 'system', content: options.systemInstruction });
+  }
+  for (const c of options.contents) {
+    const content = c.parts.map((p) => ('text' in p ? p.text : '')).join('');
+    messages.push({ role: c.role === 'model' ? 'assistant' : 'user', content });
+  }
+
+  const body: Record<string, unknown> = {
+    model: options.model,
+    messages,
+    temperature: options.temperature ?? 0.7,
+    ...(options.maxOutputTokens ? { max_tokens: options.maxOutputTokens } : {}),
+    ...(options.responseMimeType === 'application/json'
+      ? { response_format: { type: 'json_object' } }
+      : {}),
+  };
+
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${apiKey}`,
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const txt = await res.text();
+    throw new Error(`OpenAI API ${res.status}: ${txt.slice(0, 500)}`);
+  }
+
+  const data = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string } }>;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
+  };
+  const text = data.choices?.[0]?.message?.content ?? '';
+  let json: T | null = null;
+  if (options.responseMimeType === 'application/json' && text) {
+    try { json = JSON.parse(text) as T; } catch { json = null; }
+  }
+  return {
+    json,
+    text,
+    usage: {
+      inputTokens: data.usage?.prompt_tokens ?? 0,
+      outputTokens: data.usage?.completion_tokens ?? 0,
+      thinkingTokens: 0,
     },
     raw: data,
   };

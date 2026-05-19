@@ -13,8 +13,10 @@ export async function checkArticleQuota(
   const { data, error } = await sb.rpc("get_project_usage", { prj_id: projectId });
   
   if (error || !data) {
-    // Default fallback if RPC fails or not loaded yet
-    return { allowed: true, remaining: 999, willOverage: false };
+    // M-13 修正: RPC 失敗時は fail-closed（課金漏れ防止）
+    // allowed: true を返していたため、DB 障害時に無制限利用が許可されていた
+    console.error('checkArticleQuota RPC failed', error?.message);
+    return { allowed: false, remaining: 0, willOverage: false };
   }
 
   const used = Number(data.used);

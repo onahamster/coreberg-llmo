@@ -45,8 +45,14 @@ export async function middleware(request: NextRequest) {
 
   // 🛡️ レイヤー 1: WAF/IPアドレス検証（IP制限が設定されている場合）
   if (IP_ALLOWLIST.length > 0) {
-    const clientIp = request.ip || request.headers.get('x-forwarded-for') || '';
-    const isAllowedIp = IP_ALLOWLIST.some(allowedIp => clientIp.includes(allowedIp));
+    // M-9 修正: Cloudflare では cf-connecting-ip が唯一信頼できるヘッダ
+    // x-forwarded-for はクライアントが自由にセット可能なため使用禁止
+    // request.ip は Cloudflare Workers では undefined（Vercel 専用）
+    const clientIp =
+      request.headers.get('cf-connecting-ip') ||
+      request.headers.get('x-real-ip') ||
+      '';
+    const isAllowedIp = IP_ALLOWLIST.some((allowedIp) => clientIp === allowedIp);
     if (!isAllowedIp) {
       return new NextResponse('Access Denied: IP address not allowed', { status: 403 });
     }
@@ -99,7 +105,14 @@ export async function middleware(request: NextRequest) {
       .single();
 
     if (profile?.totp_enabled) {
-      const is2faVerified = request.cookies.get('admin_2fa_verified')?.value === 'true';
+      // M-10 修正: 署名なしの Cookie ('true') は DevTools で改ざん可能なため
+      // HMAC-SHA256 で署名したトークンを検証する。
+      // 2FA 完了時に /api/auth/2fa-verify エンドポイントで署名して Cookie を発行すること。
+      const TFA_HMAC_SECRET = process.env.ADMIN_2FA_HMAC_SECRET;
+      const rawCookie = request.cookies.get('admin_2fa_verified')?.value;
+      const is2faVerified = TFA_HMAC_SECRET && rawCookie
+        ? await verifyHmacCookie(rawCookie, user.id, TFA_HMAC_SECRET)
+        : false;
       if (!is2faVerified) {
         // 2FA検証が未完了なら /2fa 画面へリダイレクト
         const url = request.nextUrl.clone();
@@ -130,3 +143,46 @@ export const config = {
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };
+
+/**
+ * M-10: HMAC-SHA256 署名 Cookie の検証ヘルパー
+ * Cookie 値は `${userId}:${timestamp}:${hmacHex}` の形式
+ * /api/auth/2fa-verify エンドポイントで発行し、ここで検証する
+ */
+async function verifyHmacCookie(
+  rawCookie: string,
+  userId: string,
+  secret: string,
+): Promise<boolean> {
+  try {
+    const [cookieUserId, timestamp, hmacHex] = rawCookie.split(':');
+    if (cookieUserId !== userId) return false;
+
+    // 有効期限チェック（8時間）
+    const issuedAt = parseInt(timestamp ?? '0', 10);
+    if (Date.now() - issuedAt > 8 * 60 * 60 * 1000) return false;
+
+    // HMAC 再計算して比較
+    const encoder = new TextEncoder();
+    const keyData = encoder.encode(secret);
+    const message = encoder.encode(`${cookieUserId}:${timestamp}`);
+    const cryptoKey = await crypto.subtle.importKey(
+      'raw', keyData, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign'],
+    );
+    const sigBuffer = await crypto.subtle.sign('HMAC', cryptoKey, message);
+    const sigHex = Array.from(new Uint8Array(sigBuffer))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    // タイミング攻撃防止: 定数時間比較
+    if (sigHex.length !== (hmacHex ?? '').length) return false;
+    let diff = 0;
+    for (let i = 0; i < sigHex.length; i++) {
+      diff |= sigHex.charCodeAt(i) ^ (hmacHex ?? '').charCodeAt(i);
+    }
+    return diff === 0;
+  } catch {
+    return false;
+  }
+}
+

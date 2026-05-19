@@ -2,8 +2,9 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/lib/auth/admin-guard";
 import { getServiceClient } from "@/lib/supabase/service";
 
-export async function PATCH(req: Request, { params }: { params: { key: string } }) {
+export async function PATCH(req: Request, { params }: { params: Promise<{ key: string }> }) {
   const { user } = await requireAdmin();
+  const { key } = await params;
   const patch = await req.json();
   const sb = getServiceClient();
   
@@ -18,7 +19,7 @@ export async function PATCH(req: Request, { params }: { params: { key: string } 
   const { error } = await sb
     .from("feature_flags")
     .update(allowed)
-    .eq("key", params.key);
+    .eq("key", key);
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
@@ -31,7 +32,7 @@ export async function PATCH(req: Request, { params }: { params: { key: string } 
       actor_type: "admin",
       action: "feature_flag.updated",
       target_type: "feature_flag",
-      target_id: params.key,
+      target_id: key,
       metadata: allowed,
     });
   } catch (e) {
