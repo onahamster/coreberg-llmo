@@ -64,7 +64,7 @@ export function ArticleActions({ projectId, article }: { projectId: string; arti
         本文 HTML をコピー
       </button>
 
-      {article.schema_jsonb && (
+      {!!article.schema_jsonb && (
         <button onClick={handleCopySchema} style={btnSecondary}>
           Schema.org JSON をコピー
         </button>

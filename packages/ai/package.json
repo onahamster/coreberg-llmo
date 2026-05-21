@@ -23,6 +23,7 @@
   },
   "dependencies": {
     "@coreberg/shared": "workspace:*",
+    "@coreberg/workers-shared": "workspace:*",
     "@supabase/supabase-js": "^2.46.1",
     "zod": "^3.23.8"
   },

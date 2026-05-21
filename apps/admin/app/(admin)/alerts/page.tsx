@@ -2,10 +2,11 @@ import { requireAdmin } from "@/lib/auth/admin-guard";
 import { getServerClient } from "@/lib/supabase/server";
 import { AlertActions } from "./_components/AlertActions";
 
-export default async function AlertsPage({ searchParams }: { searchParams: { status?: string } }) {
+export default async function AlertsPage({ searchParams }: { searchParams: Promise<{ status?: string }> }) {
   await requireAdmin();
   const sb = getServerClient();
-  const status = searchParams.status ?? "open";
+  const resolvedSearchParams = await searchParams;
+  const status = resolvedSearchParams.status ?? "open";
   
   let query = sb
     .from("ops_alerts")

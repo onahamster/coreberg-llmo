@@ -9,21 +9,28 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@coreberg/billing": "workspace:*",
+    "@coreberg/observability": "workspace:*",
+    "@coreberg/shared": "workspace:*",
+    "@coreberg/wordpress": "workspace:*",
+    "@coreberg/workers-shared": "workspace:*",
+    "@sentry/nextjs": "^8.40.0",
+    "@supabase/ssr": "^0.5.1",
+    "@supabase/supabase-js": "^2.43.0",
+    "jsonwebtoken": "^9.0.0",
     "next": "^15.0.0",
     "react": "^19.0.0-rc.0",
     "react-dom": "^19.0.0-rc.0",
-    "@supabase/supabase-js": "^2.43.0",
-    "@supabase/ssr": "^0.5.1",
-    "@coreberg/shared": "workspace:*",
-    "@coreberg/billing": "workspace:*",
     "stripe": "^16.0.0",
-    "jsonwebtoken": "^9.0.0"
+    "zod": "^3.23.8"
   },
   "devDependencies": {
-    "typescript": "^5.4.5",
+    "@cloudflare/workers-types": "^4.20241112.0",
+    "@opennextjs/cloudflare": "^1.19.11",
+    "@types/jsonwebtoken": "^9.0.0",
     "@types/node": "^20.12.7",
     "@types/react": "^18.2.79",
     "@types/react-dom": "^18.2.25",
-    "@types/jsonwebtoken": "^9.0.0"
+    "typescript": "^5.4.5"
   }
 }

@@ -102,7 +102,7 @@ function aggregate<T extends { cost_cents: number; call_count: number }>(
     e.calls += Number(r.call_count);
     m.set(k, e);
   }
-  return [...m.entries()]
+  return Array.from(m.entries())
     .map(([key, v]) => ({ key, ...v }))
     .sort((a, b) => b.cost - a.cost);
 }

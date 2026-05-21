@@ -21,7 +21,7 @@ export async function POST(request: Request) {
   }
 
   const { userId: adminUserId } = await requireAdmin();
-  const body = await request.json().catch(() => null);
+  const body = (await request.json().catch(() => null)) as any;
   const targetUserId = body?.userId;
 
   if (!targetUserId || typeof targetUserId !== 'string') {
@@ -48,17 +48,24 @@ export async function POST(request: Request) {
   );
 
   // M-6: 監査ログに記録（admin による impersonate は最重要の監査対象）
-  await sb.rpc('log_audit', {
-    p_actor_id: adminUserId,
-    p_actor_role: 'admin',
-    p_action: 'admin.impersonate_issued',
-    p_resource_type: 'user',
-    p_resource_id: targetUserId,
-    p_target_user_id: targetUserId,
-    p_metadata: { target_email: targetUser.user?.email },
-    p_actor_ip: request.headers.get('cf-connecting-ip'),
-    p_actor_user_agent: request.headers.get('user-agent'),
-  }).catch((e) => console.error('audit log failed for impersonate', e));
+  try {
+    const { error: rpcErr } = await sb.rpc('log_audit', {
+      p_actor_id: adminUserId,
+      p_actor_role: 'admin',
+      p_action: 'admin.impersonate_issued',
+      p_resource_type: 'user',
+      p_resource_id: targetUserId,
+      p_target_user_id: targetUserId,
+      p_metadata: { target_email: targetUser.user?.email },
+      p_actor_ip: request.headers.get('cf-connecting-ip'),
+      p_actor_user_agent: request.headers.get('user-agent'),
+    });
+    if (rpcErr) {
+      console.error('audit log failed for impersonate', rpcErr);
+    }
+  } catch (e) {
+    console.error('audit log failed for impersonate', e);
+  }
 
   const redirectUrl = `${
     process.env.NEXT_PUBLIC_APP_URL || 'https://app.coreberg.com'

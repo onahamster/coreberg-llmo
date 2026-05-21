@@ -25,7 +25,7 @@ export async function TopErrorsTable() {
     grouped.set(k, e);
   }
 
-  const rows = [...grouped.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+  const rows = Array.from(grouped.values()).sort((a, b) => b.count - a.count).slice(0, 10);
 
   return (
     <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 backdrop-blur-md">

@@ -1,4 +1,5 @@
-import * as Sentry from "@sentry/cloudflare";
+import * as Sentry from "@sentry/core";
+import { CloudflareClient, getDefaultIntegrations } from "@sentry/cloudflare";
 
 export interface SentryEnv {
   SENTRY_DSN?: string;
@@ -9,14 +10,18 @@ export interface SentryEnv {
 
 export function initSentry(env: SentryEnv): void {
   if (!env.SENTRY_DSN) return;
-  Sentry.init({
+
+  const clientOptions = {
     dsn: env.SENTRY_DSN,
     environment: env.SENTRY_ENVIRONMENT ?? "production",
     release: env.SENTRY_RELEASE ?? undefined,
     tracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE
       ? Number(env.SENTRY_TRACES_SAMPLE_RATE) : 0.1,
     sendDefaultPii: false,
-  });
+    defaultIntegrations: getDefaultIntegrations({ dsn: env.SENTRY_DSN }),
+  };
+
+  Sentry.initAndBind(CloudflareClient, clientOptions as any);
 }
 
 export function captureException(err: unknown, context?: Record<string, unknown>): void {

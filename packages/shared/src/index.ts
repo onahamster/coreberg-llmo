@@ -1,3 +1,3 @@
-export * from './auth.ts';
-export * from './health/score.ts';
+export * from './auth';
+export * from './health/score';
 

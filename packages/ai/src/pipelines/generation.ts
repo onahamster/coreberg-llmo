@@ -234,10 +234,15 @@ export async function clusterAndSelect(
     }
   }
 
-  const items: ReturnType<typeof clusterAndSelect> extends Promise<infer R>
-    ? R['items']
-    : never = [];
-  for (const id of selectedSet) {
+  const items: {
+    subqueryId: string;
+    clusterIndex: number;
+    citationLikelihood: number;
+    competitorWeakness: number;
+    topicContribution: number;
+    citationScore: number;
+  }[] = [];
+  for (const id of Array.from(selectedSet)) {
     const score = input.scored.find((s) => s.id === id);
     if (!score) continue;
     const clusterIndex = clusters.findIndex((c) => c.subquery_ids.includes(id));

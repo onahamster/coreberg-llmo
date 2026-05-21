@@ -40,6 +40,6 @@ export async function finishObserved(
   obs: Observed, res: Response | { status: number }, error?: unknown,
 ): Promise<void> {
   if (error) captureException(error);
-  await obs.trace.finish("status" in res ? res.status : res.status ?? 200, obs.logger);
+  await obs.trace.finish(res.status, obs.logger);
   await obs.logger.flushNow();
 }

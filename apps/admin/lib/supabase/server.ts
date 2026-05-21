@@ -1,5 +1,13 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
+import { createServiceSupabase } from './service';
+
+/**
+ * Admin アプリ用の Service Role Supabase クライアント（RLS をバイパス、同期呼び出し用）
+ */
+export function getServerClient() {
+  return createServiceSupabase();
+}
 
 /**
  * Next.js Server Component / Route Handler 用の Supabase クライアント（anon キー）

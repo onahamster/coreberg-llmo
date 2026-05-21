@@ -5,7 +5,7 @@ import { getServiceClient } from "@/lib/supabase/service";
 export async function PATCH(req: Request, { params }: { params: Promise<{ key: string }> }) {
   const { user } = await requireAdmin();
   const { key } = await params;
-  const patch = await req.json();
+  const patch = (await req.json()) as any;
   const sb = getServiceClient();
   
   const allowed: Record<string, any> = {};

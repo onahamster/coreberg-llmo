@@ -8,7 +8,7 @@ export async function POST(
 ) {
   const { id, articleId } = await params;
   await requireProjectAccess(id);
-  const { scheduledAt } = await req.json().catch(() => ({}));
+  const { scheduledAt } = await req.json().catch(() => ({})) as { scheduledAt?: string };
   const bindings = await getBindings();
 
   if (bindings && bindings.ARTICLE_QUEUE) {
@@ -18,7 +18,7 @@ export async function POST(
       type: "draft", // or standard message layout
       projectId: id,
       articleId: articleId,
-    });
+    } as any);
   }
 
   return NextResponse.json({ ok: true, queued: true });

@@ -37,8 +37,8 @@ export class LearningWorkflow extends WorkflowEntrypoint<WorkersEnv, LearningPar
     const insight = await step.do(
       'analyze-patterns',
       { retries: { limit: 2, delay: '1 minute', backoff: 'exponential' }, timeout: '15 minutes' },
-      () => runLearningLoop(this.env, { projectId, month, data }),
-    );
+      () => runLearningLoop(this.env, { projectId, month, data }) as any,
+    ) as any;
 
     await step.do('save-insight', async () => {
       const { error } = await db.from('learning_insights').upsert(

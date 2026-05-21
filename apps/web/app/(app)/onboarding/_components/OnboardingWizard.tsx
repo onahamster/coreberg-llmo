@@ -50,7 +50,7 @@ export function OnboardingWizard() {
         body: JSON.stringify(form),
       });
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
+        const j = await res.json().catch(() => ({})) as { error?: string };
         throw new Error(j.error ?? 'プロジェクト作成に失敗しました');
       }
       const j = (await res.json()) as { projectId: string };

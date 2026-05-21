@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { redirect } from 'next/navigation';
+import { createServerSupabase } from '@/lib/supabase/server';
 
 /**
  * Route Handler / Server Component から認証済み顧客ユーザーを取得する。
@@ -20,10 +21,10 @@ export async function requireCustomer(): Promise<{ userId: string }> {
         getAll() {
           return cookieStore.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: any) {
           try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options),
+            cookiesToSet.forEach((c: any) =>
+              cookieStore.set(c.name, c.value, c.options),
             );
           } catch {
             // Server Component から呼ばれた場合は Cookie 書き込み不可（無視）
@@ -44,3 +45,25 @@ export async function requireCustomer(): Promise<{ userId: string }> {
 
   return { userId: user.id };
 }
+
+/**
+ * 現在ログインしているユーザーが、指定されたプロジェクトの所有者であるか確認する。
+ * 所有していない場合はエラーを投げる。
+ */
+export async function requireProjectAccess(projectId: string): Promise<void> {
+  const { userId } = await requireCustomer();
+  const supabase = await createServerSupabase();
+
+  const { data: project, error } = await supabase
+    .from('projects')
+    .select('id')
+    .eq('id', projectId)
+    .eq('user_id', userId)
+    .is('deleted_at', null)
+    .maybeSingle();
+
+  if (error || !project) {
+    throw new Error('Unauthorized project access');
+  }
+}
+

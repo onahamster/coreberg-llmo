@@ -46,7 +46,7 @@ export default async function ObservabilityPage() {
     s.p95s.push(Number(m.p95));
     buckets.set(key, s);
   }
-  const series = [...buckets.entries()].sort(([a], [b]) => a < b ? -1 : 1).map(([t, v]) => ({
+  const series = Array.from(buckets.entries()).sort(([a], [b]) => a < b ? -1 : 1).map(([t, v]) => ({
     t,
     errorRate: v.req > 0 ? v.err / v.req : 0,
     p95: v.p95s.length ? Math.round(v.p95s.reduce((a, b) => a + b, 0) / v.p95s.length) : 0,
