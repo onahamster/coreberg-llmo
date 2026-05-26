@@ -8,9 +8,9 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.43.0"
+    "@supabase/supabase-js": "^2.106.2"
   },
   "devDependencies": {
-    "typescript": "^5.4.5"
+    "typescript": "^6.0.3"
   }
 }
